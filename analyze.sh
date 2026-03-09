@@ -174,12 +174,14 @@ products = data.get('products', [])
 print(json.dumps({'stats': stats, 'total': len(products)}))
 " 2>/dev/null || echo '{"stats":{},"total":0}')
 
-# 渲染报告
-REPORT=$(python3 - <<PYEOF
-import re, json, sys
+# 渲染报告（通过环境变量传递数据，避免 heredoc 注入问题）
+export _SS_ANALYSIS="$ANALYSIS"
+export _SS_STATS="$STATS"
+REPORT=$(python3 - <<'PYEOF'
+import re, json, os
 
-raw = """$ANALYSIS"""
-stats_raw = json.loads("""$STATS""")
+raw = os.environ.get('_SS_ANALYSIS', '')
+stats_raw = json.loads(os.environ.get('_SS_STATS', '{"stats":{},"total":0}'))
 stats = stats_raw.get('stats', {})
 total = stats_raw.get('total', 0)
 
@@ -310,6 +312,7 @@ report += f"""
 print(report)
 PYEOF
 )
+unset _SS_ANALYSIS _SS_STATS
 
 echo "$REPORT"
 

@@ -196,11 +196,13 @@ fi
 # 合并数据并计算统计指标
 echo "📦 计算市场统计..." >&2
 
-MERGED=$(python3 - <<PYEOF
-import json, sys
+export _SS_FETCH_PRODUCTS="$PRODUCTS_JSON"
+export _SS_FETCH_KW="$KEYWORD_DATA"
+MERGED=$(python3 - <<'PYEOF'
+import json, sys, os
 
-products = json.loads("""$PRODUCTS_JSON""")
-kw_data = json.loads("""$KEYWORD_DATA""")
+products = json.loads(os.environ.get('_SS_FETCH_PRODUCTS', '[]'))
+kw_data = json.loads(os.environ.get('_SS_FETCH_KW', '{}'))
 
 # 计算市场统计
 def safe_float(v):
@@ -304,6 +306,7 @@ output = {
 print(json.dumps(output, ensure_ascii=False, indent=2))
 PYEOF
 )
+unset _SS_FETCH_PRODUCTS _SS_FETCH_KW
 
 echo "✅ 数据整合完成" >&2
 
