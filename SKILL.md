@@ -34,8 +34,14 @@ bash ~/.claude/skills/sellersprite-product-research/selection.sh --keyword "wire
 # Specify marketplace (default: US)
 bash ~/.claude/skills/sellersprite-product-research/selection.sh --keyword "yoga mat" --marketplace UK
 
-# Specify month
-bash ~/.claude/skills/sellersprite-product-research/selection.sh --keyword "phone case" --month 202501
+# Use a specific AI model
+bash ~/.claude/skills/sellersprite-product-research/selection.sh --keyword "phone case" --model claude
+bash ~/.claude/skills/sellersprite-product-research/selection.sh --keyword "phone case" --model gemini
+bash ~/.claude/skills/sellersprite-product-research/selection.sh --keyword "phone case" --model gpt-5
+bash ~/.claude/skills/sellersprite-product-research/selection.sh --keyword "phone case" --model grok
+
+# Use full model ID
+bash ~/.claude/skills/sellersprite-product-research/selection.sh --keyword "yoga mat" --model anthropic/claude-opus-4-6
 
 # Analyze a competitor by ASIN
 bash ~/.claude/skills/sellersprite-product-research/selection.sh --asin B08N5WRWNW --marketplace US
@@ -43,6 +49,26 @@ bash ~/.claude/skills/sellersprite-product-research/selection.sh --asin B08N5WRW
 # Save report to file
 bash ~/.claude/skills/sellersprite-product-research/selection.sh --keyword "LED strip" --output report.md
 ```
+
+## Supported Models
+
+Uses `openclaw` for AI inference. Pass `--model` with a shorthand alias or full model ID:
+
+| Alias | Model |
+|---|---|
+| `claude` | anthropic/claude-sonnet-4-6 |
+| `claude-opus` | anthropic/claude-opus-4-6 |
+| `claude-haiku` | anthropic/claude-haiku-4-5 |
+| `gemini` | google/gemini-2.5-pro |
+| `gemini-flash` | google/gemini-2.5-flash |
+| `gpt-4o` | openai/gpt-4o |
+| `gpt-5` | openai/gpt-5 |
+| `grok` | xai/grok-4 |
+| `deepseek` | groq/deepseek-r1-distill-llama-70b |
+| `qwen` | groq/qwen/qwen3-32b |
+| `mistral` | mistral/mistral-large-latest |
+
+Any full model ID from `openclaw models list --all` is also accepted.
 
 ## Sample Output
 

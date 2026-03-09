@@ -8,14 +8,45 @@ DATA_FILE="${1:-}"
 QUERY="${2:-unknown}"
 MARKETPLACE="${3:-US}"
 OUTPUT_FILE=""
+MODEL_ARG=""
 
 shift 3 || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --output) OUTPUT_FILE="$2"; shift 2 ;;
+    --model) MODEL_ARG="$2"; shift 2 ;;
     *) shift ;;
   esac
 done
+
+# 模型别名映射
+resolve_model() {
+  local m="$1"
+  case "$m" in
+    claude|claude-sonnet)          echo "anthropic/claude-sonnet-4-6" ;;
+    claude-opus)                   echo "anthropic/claude-opus-4-6" ;;
+    claude-haiku)                  echo "anthropic/claude-haiku-4-5" ;;
+    claude-3-7|claude-3-7-sonnet)  echo "anthropic/claude-3-7-sonnet-latest" ;;
+    gemini|gemini-pro)             echo "google/gemini-2.5-pro" ;;
+    gemini-flash)                  echo "google/gemini-2.5-flash" ;;
+    gemini-3|gemini-3-pro)         echo "google/gemini-3-pro-preview" ;;
+    gpt-4o)                        echo "openai/gpt-4o" ;;
+    gpt-4.1)                       echo "openai/gpt-4.1" ;;
+    gpt-5|gpt5)                    echo "openai/gpt-5" ;;
+    gpt-5.2|gpt52)                 echo "openai/gpt-5.2" ;;
+    o3)                            echo "openai/o3" ;;
+    o4-mini)                       echo "openai/o4-mini" ;;
+    grok|grok-4)                   echo "xai/grok-4" ;;
+    grok-3)                        echo "xai/grok-3" ;;
+    grok-3-mini)                   echo "xai/grok-3-mini" ;;
+    deepseek|deepseek-r1)          echo "groq/deepseek-r1-distill-llama-70b" ;;
+    qwen|qwen3)                    echo "groq/qwen/qwen3-32b" ;;
+    mistral|mistral-large)         echo "mistral/mistral-large-latest" ;;
+    llama|llama4)                  echo "groq/meta-llama/llama-4-maverick-17b-128e-instruct" ;;
+    venice)                        echo "venice/claude-sonnet-4-6" ;;
+    *)                             echo "$m" ;;  # 透传完整 model ID
+  esac
+}
 
 if [[ -z "$DATA_FILE" || ! -f "$DATA_FILE" ]]; then
   echo "❌ 需要提供数据文件" >&2
@@ -146,8 +177,25 @@ VERDICT_EN: [Final verdict in English, under 50 words]
 PROMPT
 )
 
+# 模型切换
+ORIG_MODEL=""
+if [[ -n "$MODEL_ARG" ]]; then
+  RESOLVED_MODEL=$(resolve_model "$MODEL_ARG")
+  echo "🤖 使用模型: $RESOLVED_MODEL" >&2
+  ORIG_MODEL=$(openclaw models list --plain 2>/dev/null | head -1 || echo "")
+  openclaw models set "$RESOLVED_MODEL" >/dev/null 2>&1 || {
+    echo "⚠️  模型切换失败: $RESOLVED_MODEL，使用当前默认模型" >&2
+    ORIG_MODEL=""
+  }
+fi
+
 SESSION_ID="ss-$(date +%s)"
 RESPONSE=$(openclaw agent --local --session-id "$SESSION_ID" -m "$PROMPT" --json 2>/dev/null)
+
+# 恢复原始模型
+if [[ -n "$ORIG_MODEL" ]]; then
+  openclaw models set "$ORIG_MODEL" >/dev/null 2>&1 || true
+fi
 
 ANALYSIS=$(echo "$RESPONSE" | python3 -c "
 import sys, json
@@ -175,8 +223,13 @@ print(json.dumps({'stats': stats, 'total': len(products)}))
 " 2>/dev/null || echo '{"stats":{},"total":0}')
 
 # 渲染报告（通过环境变量传递数据，避免 heredoc 注入问题）
+ACTUAL_MODEL=""
+if [[ -n "$MODEL_ARG" ]]; then
+  ACTUAL_MODEL=$(resolve_model "$MODEL_ARG")
+fi
 export _SS_ANALYSIS="$ANALYSIS"
 export _SS_STATS="$STATS"
+export _SS_MODEL="$ACTUAL_MODEL"
 REPORT=$(python3 - <<'PYEOF'
 import re, json, os
 
@@ -184,6 +237,7 @@ raw = os.environ.get('_SS_ANALYSIS', '')
 stats_raw = json.loads(os.environ.get('_SS_STATS', '{"stats":{},"total":0}'))
 stats = stats_raw.get('stats', {})
 total = stats_raw.get('total', 0)
+model_used = os.environ.get('_SS_MODEL', '')
 
 def get(key):
     m = re.search(rf'^{key}:\s*(.+)$', raw, re.MULTILINE)
@@ -305,14 +359,14 @@ report += f"""
 
 ══════════════════════════════════════════════
   由卖家精灵选品 Skill 生成 | Powered by SellerSprite AI
-  数据来源: 卖家精灵 open.sellersprite.com
+  数据来源: 卖家精灵 open.sellersprite.com{"  AI 模型: " + model_used if model_used else ""}
 ══════════════════════════════════════════════
 """
 
 print(report)
 PYEOF
 )
-unset _SS_ANALYSIS _SS_STATS
+unset _SS_ANALYSIS _SS_STATS _SS_MODEL
 
 echo "$REPORT"
 

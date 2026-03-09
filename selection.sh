@@ -36,6 +36,10 @@ usage() {
   echo "  --marketplace CODE   市场代码（默认: US）US/UK/DE/JP/CA/FR/IT/ES/MX/AU"
   echo "  --month yyyyMM       查询月份（默认: 最近月份）"
   echo "  --size N             拉取产品数量（默认: 50，max 100）"
+  echo "  --model MODEL        AI 模型（默认使用 openclaw 当前配置）"
+  echo "                       别名: claude/claude-opus/claude-haiku/gemini/gemini-flash"
+  echo "                             gpt-4o/gpt-5/grok/deepseek/qwen/mistral"
+  echo "                       完整ID: anthropic/claude-sonnet-4-6, openai/gpt-5 等"
   echo "  --output FILE        保存报告到文件"
   echo "  --help               显示帮助"
   echo ""
@@ -53,6 +57,7 @@ MARKETPLACE="US"
 MONTH=""
 SIZE=50
 OUTPUT_FILE=""
+MODEL=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -62,6 +67,7 @@ while [[ $# -gt 0 ]]; do
     --marketplace) MARKETPLACE=$(echo "$2" | tr '[:lower:]' '[:upper:]'); shift 2 ;;
     --month) MONTH="$2"; shift 2 ;;
     --size) SIZE="$2"; shift 2 ;;
+    --model) MODEL="$2"; shift 2 ;;
     --output) OUTPUT_FILE="$2"; shift 2 ;;
     -*) echo -e "${RED}未知参数: $1${NC}" >&2; usage ;;
     *) KEYWORD="$1"; shift ;;
@@ -114,7 +120,11 @@ if [[ -n "$KEYWORD" ]]; then
 else
   echo -e "${GREEN}▶ 竞品市场分析 ASIN: ${YELLOW}$ASIN${NC}"
 fi
-echo -e "  市场: $MARKETPLACE | 数据量: $SIZE 条"
+if [[ -n "$MODEL" ]]; then
+  echo -e "  市场: $MARKETPLACE | 数据量: $SIZE 条 | 模型: $MODEL"
+else
+  echo -e "  市场: $MARKETPLACE | 数据量: $SIZE 条"
+fi
 echo ""
 
 # 临时文件
@@ -153,18 +163,11 @@ echo ""
 # 步骤2: AI 分析
 echo -e "${BLUE}[2/2] AI 选品深度分析...${NC}"
 
-if [[ -n "$OUTPUT_FILE" ]]; then
-  bash "$SKILL_DIR/analyze.sh" \
-    "$TEMP_DATA" \
-    "${KEYWORD:-$ASIN}" \
-    "$MARKETPLACE" \
-    --output "$OUTPUT_FILE"
-else
-  bash "$SKILL_DIR/analyze.sh" \
-    "$TEMP_DATA" \
-    "${KEYWORD:-$ASIN}" \
-    "$MARKETPLACE"
-fi
+ANALYZE_ARGS=("$TEMP_DATA" "${KEYWORD:-$ASIN}" "$MARKETPLACE")
+[[ -n "$MODEL" ]] && ANALYZE_ARGS+=(--model "$MODEL")
+[[ -n "$OUTPUT_FILE" ]] && ANALYZE_ARGS+=(--output "$OUTPUT_FILE")
+
+bash "$SKILL_DIR/analyze.sh" "${ANALYZE_ARGS[@]}"
 
 echo ""
 echo -e "${GREEN}✅ 选品分析完成！${NC}"
